@@ -108,7 +108,7 @@ fn generate_initial_hash_values() -> [u32; 8] {
     constants
 }
 
-fn pad(m: Vec<u8>) -> Vec<u8> {
+fn pad(m: &[u8]) -> Vec<u8> {
     let L = m.len();
     let required_padding_bits = 512 - ((m.len() * 8 + 1 + 64) % 512);
     let required_padding_bytes = ((required_padding_bits as f64) / 8_f64).ceil() as usize;
@@ -129,9 +129,14 @@ fn main() {
 
     println!("k: {:08x?}\nh: {:08x?}", k, h);
 
-    let message = String::from("Hello,world").into_bytes();
-    let padded = pad(message);
+    // let message = String::from("Hello,world").into_bytes();
+    let message = vec!{0xff_u8; 512/8};
+    let padded = pad(&message);
     println!("({}) {:02x?}", padded.len() * 8, padded);
+
+    for chunk in padded.chunks_exact(512/8) {
+        print!("Got chunk: {:02x?}\n", chunk);
+    }
 
 }
 
