@@ -1,6 +1,7 @@
 use std::fmt;
 use std::fmt::Formatter;
 use primal;
+use std::convert::TryInto;
 
 struct Bytefield<T>(T);
 
@@ -129,13 +130,20 @@ fn main() {
 
     println!("k: {:08x?}\nh: {:08x?}", k, h);
 
-    // let message = String::from("Hello,world").into_bytes();
-    let message = vec!{0xff_u8; 512/8};
+    let message = String::from("Hello,world").into_bytes();
+    // let message = vec!{0xff_u8; 512/8};
     let padded = pad(&message);
     println!("({}) {:02x?}", padded.len() * 8, padded);
 
     for chunk in padded.chunks_exact(512/8) {
         print!("Got chunk: {:02x?}\n", chunk);
+        // Create schedule
+        let mut schedule = [0_u32; 64];
+        // Copy the chunk into the schedule
+        chunk.chunks_exact(chunk.len() / 16)
+            .enumerate()
+            .for_each(|(i,w)| schedule[i] = u32::from_be_bytes(w.try_into().expect("chunk chunk wrong size")));
+        print!("Init'd schedule: {:02x?}\n", &schedule);
     }
 
 }
