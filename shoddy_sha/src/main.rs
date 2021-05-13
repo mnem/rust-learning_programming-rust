@@ -110,8 +110,8 @@ fn generate_initial_hash_values() -> [u32; 8] {
 }
 
 fn pad(m: &[u8]) -> Vec<u8> {
-    let L = m.len();
-    let required_padding_bits = 512 - ((m.len() * 8 + 1 + 64) % 512);
+    let message_len = m.len();
+    let required_padding_bits = 512 - ((message_len * 8 + 1 + 64) % 512);
     let required_padding_bytes = ((required_padding_bits as f64) / 8_f64).ceil() as usize;
     let required_padding_bytes = required_padding_bytes - 1; // We always pad with 0x70_u8
 
@@ -119,7 +119,7 @@ fn pad(m: &[u8]) -> Vec<u8> {
     padded.extend(m);
     padded.extend(vec![0x70_u8]);
     padded.extend(vec![0; required_padding_bytes]);
-    padded.extend(L.to_be_bytes().iter());
+    padded.extend(message_len.to_be_bytes().iter());
 
     padded
 }
