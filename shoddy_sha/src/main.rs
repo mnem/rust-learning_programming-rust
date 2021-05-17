@@ -144,6 +144,14 @@ fn main() {
             .enumerate()
             .for_each(|(i,w)| schedule[i] = u32::from_be_bytes(w.try_into().expect("chunk chunk wrong size")));
         print!("Init'd schedule: {:02x?}\n", &schedule);
+
+        // Extend
+        for i in 16..64 {
+            let s0 = schedule[i - 15].rotate_right(7) ^ schedule[i- 15].rotate_right(18) ^ (schedule[i - 15] >> 3);
+            let s1 = schedule[i - 2].rotate_right(17) ^ schedule[i - 2].rotate_right(19) ^ (schedule[i - 2] >> 10);
+            schedule[i] = schedule[i - 16].wrapping_add(s0).wrapping_add(schedule[i - 7]).wrapping_add(s1);
+        }
+
     }
 
 }
