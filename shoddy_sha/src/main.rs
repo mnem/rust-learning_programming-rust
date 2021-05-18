@@ -126,12 +126,11 @@ fn pad(m: &[u8]) -> Vec<u8> {
 
 fn main() {
     let k = generate_round_constants();
-    let mut h = generate_initial_hash_values();
+    let mut hash = generate_initial_hash_values();
 
-    println!("k: {:08x?}\nh: {:08x?}", k, h);
+    println!("k: {:08x?}\nhash: {:08x?}", k, hash);
 
     let message = String::from("Hello,world").into_bytes();
-    // let message = vec!{0xff_u8; 512/8};
     let padded = pad(&message);
     println!("({}) {:02x?}", padded.len() * 8, padded);
 
@@ -152,6 +151,48 @@ fn main() {
             schedule[i] = schedule[i - 16].wrapping_add(s0).wrapping_add(schedule[i - 7]).wrapping_add(s1);
         }
 
+        let mut a = hash[0];
+        let mut b = hash[1];
+        let mut c = hash[2];
+        let mut d = hash[3];
+        let mut e = hash[4];
+        let mut f = hash[5];
+        let mut g = hash[6];
+        let mut h = hash[7];
+
+        for i in 0..64 {
+            let S1 = e.rotate_right(6) ^ e.rotate_right(11) ^ e.rotate_right(25);
+            let ch = (e & f) ^ ((!e) & g);
+            let temp1 = h.wrapping_add(S1).wrapping_add(ch).wrapping_add(k[i]).wrapping_add(schedule[i]);
+            let S0 = a.rotate_right(2) ^ a.rotate_right(13) ^ a.rotate_right(22);
+            let maj = (a & b) ^ (a & c) ^ (b & c);
+            let temp2 = S0.wrapping_add(maj);
+
+            h = g;
+            g = f;
+            f = e;
+            e = d.wrapping_add(temp1);
+            d = c;
+            c = b;
+            b = a;
+            a = temp1.wrapping_add(temp2);
+        }
+
+        hash[0] = hash[0].wrapping_add(a);
+        hash[1] = hash[1].wrapping_add(b);
+        hash[2] = hash[2].wrapping_add(c);
+        hash[3] = hash[3].wrapping_add(d);
+        hash[4] = hash[4].wrapping_add(e);
+        hash[5] = hash[5].wrapping_add(f);
+        hash[6] = hash[6].wrapping_add(g);
+        hash[7] = hash[7].wrapping_add(h);
+
+        let mut digest: Vec<u8> = Vec::with_capacity(256/8);
+        for part in hash.iter() {
+            digest.extend(part.to_be_bytes().iter());
+        }
+
+        println!("Hash: {:02x?}", digest);
     }
 
 }
