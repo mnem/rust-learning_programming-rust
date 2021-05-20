@@ -2,6 +2,7 @@ use std::fmt;
 use std::fmt::Formatter;
 use primal;
 use std::convert::TryInto;
+use sha2::{Sha256, Digest};
 
 struct Bytefield<T>(T);
 
@@ -117,9 +118,9 @@ fn pad(m: &[u8]) -> Vec<u8> {
 
     let mut padded = Vec::with_capacity(m.len() + 1 + required_padding_bytes + (64/8));
     padded.extend(m);
-    padded.extend(vec![0x70_u8]);
+    padded.extend(vec![0x80_u8]);
     padded.extend(vec![0; required_padding_bytes]);
-    padded.extend(message_len.to_be_bytes().iter());
+    padded.extend((message_len * 8).to_be_bytes().iter());
 
     padded
 }
@@ -130,9 +131,21 @@ fn main() {
 
     println!("k: {:08x?}\nhash: {:08x?}", k, hash);
 
-    let message = String::from("Hello,world").into_bytes();
+    let message = String::from("hello world").into_bytes();
     let padded = pad(&message);
     println!("({}) {:02x?}", padded.len() * 8, padded);
+
+    let expected_padded = vec![
+        0b01101000u8, 0b01100101u8, 0b01101100u8, 0b01101100u8, 0b01101111u8, 0b00100000u8, 0b01110111u8, 0b01101111u8,
+        0b01110010u8, 0b01101100u8, 0b01100100u8, 0b10000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8,
+        0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8,
+        0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8,
+        0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8,
+        0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8,
+        0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8,
+        0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b01011000u8,
+    ];
+    assert_eq!(padded, expected_padded, "Padding is unexpected");
 
     for chunk in padded.chunks_exact(512/8) {
         print!("Got chunk: {:02x?}\n", chunk);
@@ -192,7 +205,11 @@ fn main() {
             digest.extend(part.to_be_bytes().iter());
         }
 
-        println!("Hash: {:02x?}", digest);
+        let hash_string = digest.iter().map(|n| format!("{:02x}", n)).collect::<String>();
+        println!("Hash    : {}", hash_string);
+        let expected = Sha256::digest(&message);
+        println!("Expected: {:02x}", expected);
+
     }
 
 }
@@ -217,12 +234,28 @@ fn main2() {
 mod tests {
     use super::*;
 
-    // #[test]
-    // fn test_get_bit() {
-    //     let msb = 0x80_00_00_00_00_00_00_00_u64;
-    //     assert_eq!(get_bit(msb, 63), '1');
-    //
-    //     let lsb = 0x1_u64;
-    //     assert_eq!(get_bit(lsb, 0), '1');
-    // }
+    #[test]
+    fn test_initial_hash_values() {
+        let hash = generate_initial_hash_values();
+        let expected = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+
+        assert_eq!(hash, expected);
+    }
+
+    #[test]
+    fn test_round_constants() {
+        let round_constants = generate_round_constants();
+        let expected = [
+            0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+            0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+            0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+            0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+            0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+            0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+            0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+            0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+        ];
+
+        assert_eq!(round_constants, expected);
+    }
 }
