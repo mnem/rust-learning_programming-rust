@@ -99,3 +99,14 @@ fn pad(m: &[u8]) -> Vec<u8> {
 
     padded
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_padding_empty_message() {
+        let subject = pad(&[]);
+        assert_eq!(subject.len(), 512/8);
+    }
+}
