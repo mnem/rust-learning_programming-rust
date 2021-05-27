@@ -104,9 +104,27 @@ fn pad(m: &[u8]) -> Vec<u8> {
 mod tests {
     use super::*;
 
+    // TODO: Move this to the super module
+    const CHUNK_BYTE_SIZE: usize = 512 / 8;
+
+    /// The max message is calculated as:
+    ///      CHUNK_BYTE_SIZE - size+of_terminator_byte - size_of_message_length_value
+    const MAX_SINGLE_CHUNK_MESSAGE_BYTE_SIZE: usize = CHUNK_BYTE_SIZE - 1 - (64 / 8);
+
     #[test]
     fn test_padding_empty_message() {
         let subject = pad(&[]);
         assert_eq!(subject.len(), 512/8);
+    }
+
+    #[test]
+    fn test_maximum_single_chunk() {
+        let max_single_chunk_message = [0xff; MAX_SINGLE_CHUNK_MESSAGE_BYTE_SIZE];
+        let subject = pad(&max_single_chunk_message);
+        assert_eq!(subject.len(), 512/8);
+
+        let one_over_max_single_chunk_message = [0xff; MAX_SINGLE_CHUNK_MESSAGE_BYTE_SIZE + 1];
+        let subject = pad(&one_over_max_single_chunk_message);
+        assert_eq!(subject.len(), 512/8 * 2);
     }
 }
