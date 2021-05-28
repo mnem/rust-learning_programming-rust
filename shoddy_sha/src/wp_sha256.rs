@@ -6,32 +6,14 @@ pub fn one_shot(message: &[u8]) -> Vec<u8> {
     let k = crate::generate_round_constants();
     let mut hash = crate::generate_initial_hash_values();
 
-    println!("k: {:08x?}\nhash: {:08x?}", k, hash);
-
-    let padded = pad(&message);
-    println!("({}) {:02x?}", padded.len() * 8, padded);
-
-    let expected_padded = vec![
-        0b01101000u8, 0b01100101u8, 0b01101100u8, 0b01101100u8, 0b01101111u8, 0b00100000u8, 0b01110111u8, 0b01101111u8,
-        0b01110010u8, 0b01101100u8, 0b01100100u8, 0b10000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8,
-        0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8,
-        0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8,
-        0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8,
-        0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8,
-        0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8,
-        0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b01011000u8,
-    ];
-    assert_eq!(padded, expected_padded, "Padding is unexpected");
-
-    for chunk in padded.chunks_exact(512/8) {
-        print!("Got chunk: {:02x?}\n", chunk);
+    for chunk in pad(&message).chunks_exact(512/8) {
         // Create schedule
         let mut schedule = [0_u32; 64];
+
         // Copy the chunk into the schedule
         chunk.chunks_exact(chunk.len() / 16)
             .enumerate()
             .for_each(|(i,w)| schedule[i] = u32::from_be_bytes(w.try_into().expect("chunk chunk wrong size")));
-        print!("Init'd schedule: {:02x?}\n", &schedule);
 
         // Extend
         for i in 16..64 {
@@ -103,6 +85,8 @@ fn pad(m: &[u8]) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sha2::{Sha256, Digest};
+    use rand::RngCore;
 
     // TODO: Move this to the super module
     const CHUNK_BYTE_SIZE: usize = 512 / 8;
@@ -126,5 +110,35 @@ mod tests {
         let one_over_max_single_chunk_message = [0xff; MAX_SINGLE_CHUNK_MESSAGE_BYTE_SIZE + 1];
         let subject = pad(&one_over_max_single_chunk_message);
         assert_eq!(subject.len(), 512/8 * 2);
+    }
+
+    #[test]
+    fn test_simple_padded_message() {
+        let subject = pad(&String::from("hello world").into_bytes());
+        let expected = vec![
+            0b01101000u8, 0b01100101u8, 0b01101100u8, 0b01101100u8, 0b01101111u8, 0b00100000u8, 0b01110111u8, 0b01101111u8,
+            0b01110010u8, 0b01101100u8, 0b01100100u8, 0b10000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8,
+            0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8,
+            0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8,
+            0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8,
+            0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8,
+            0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8,
+            0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b00000000u8, 0b01011000u8,
+        ];
+        assert_eq!(subject, expected);
+    }
+
+    #[test]
+    fn test_output() {
+        let message = String::from("hello world").into_bytes();
+        let subject = one_shot(&message);
+        let expected = Sha256::digest(&message);
+        assert_eq!(&expected.as_slice(), &subject);
+
+        let mut message = [0u8; 1025];
+        rand::thread_rng().fill_bytes(&mut message);
+        let subject = one_shot(&message);
+        let expected = Sha256::digest(&message);
+        assert_eq!(&expected.as_slice(), &subject);
     }
 }
